@@ -1,0 +1,41 @@
+[
+    {
+      "inputs": [
+        {
+          "components": [
+            { "internalType": "uint64", "name": "schemaId", "type": "uint64" },
+            { "internalType": "uint64", "name": "linkedAttestationId", "type": "uint64" },
+            { "internalType": "uint64", "name": "attestTimestamp", "type": "uint64" },
+            { "internalType": "uint64", "name": "revokeTimestamp", "type": "uint64" },
+            { "internalType": "address", "name": "attester", "type": "address" },
+            { "internalType": "uint64", "name": "validUntil", "type": "uint64" },
+            { "internalType": "uint8", "name": "dataLocation", "type": "uint8" },
+            { "internalType": "bool", "name": "revoked", "type": "bool" },
+            { "internalType": "bytes[]", "name": "recipients", "type": "bytes[]" },
+            { "internalType": "bytes", "name": "data", "type": "bytes" }
+          ],
+          "internalType": "struct Attestation",
+          "name": "attestation",
+          "type": "tuple"
+        },
+        { "internalType": "string", "name": "indexingKey", "type": "string" },
+        { "internalType": "bytes", "name": "delegateSignature", "type": "bytes" },
+        { "internalType": "bytes", "name": "extraData", "type": "bytes" }
+      ],
+      "name": "attest",
+      "outputs": [
+        { "internalType": "uint64", "name": "", "type": "uint64" }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": false, "internalType": "uint64", "name": "attestationId", "type": "uint64" },
+        { "indexed": false, "internalType": "string", "name": "indexingKey", "type": "string" }
+      ],
+      "name": "AttestationMade",
+      "type": "event"
+    }
+  ]

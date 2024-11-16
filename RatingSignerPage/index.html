@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HaLo NFC Signature</title>
+    <script src="libhalo.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .rating-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .rating-input {
+            font-size: 1.2em;
+            padding: 10px;
+            width: 80px;
+            text-align: center;
+            margin: 10px 0;
+            border: 2px solid #3498db;
+            border-radius: 5px;
+        }
+
+        .status-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+
+        #statusText {
+            color: #2c3e50;
+            font-size: 1.1em;
+            margin: 0;
+        }
+
+        .signature-preview {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            margin-top: 10px;
+            color: #34495e;
+        }
+
+        .progress-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .step {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            position: relative;
+            color: #95a5a6;
+        }
+
+        .step.active {
+            color: #3498db;
+            font-weight: bold;
+        }
+
+        .step.completed {
+            color: #27ae60;
+        }
+
+        .step::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #ddd;
+            border-radius: 50%;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .step.active::after {
+            background-color: #3498db;
+        }
+
+        .debug-console {
+            background-color: #1a1a1a;
+            color: #00ff00;
+            font-family: monospace;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .debug-console .error {
+            color: #ff4444;
+        }
+
+        .debug-console .warning {
+            color: #ffaa00;
+        }
+
+        .debug-console .info {
+            color: #00ff00;
+        }
+
+        .debug-title {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .step.completed::after {
+            background-color: #27ae60;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+      
+        <h1>Rate Your Mentor</h1>
+        
+        <div class="progress-steps">
+            <div class="step completed" id="step1">Request</div>
+            <div class="step" id="step2">Rating</div>
+            <div class="step" id="step3">NFC</div>
+            <div class="step" id="step4">Confirm</div>
+        </div>
+
+        <div class="status-box">
+            <p id="statusText">Loading request details...</p>
+        </div>
+
+        <div class="rating-container">
+            <input type="number" id="ratingInput" class="rating-input" min="1" max="10" placeholder="1-10" style="display: none">
+        </div>
+
+        <div id="signaturePreview" class="signature-preview" style="display: none">
+            Signature: <span id="signatureShort"></span>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <button id="actionButton" onclick="handleAction()" style="display: none">Start Rating</button>
+            <button id="retryButton" onclick="retryNFC()" class="retry-button" style="display: none">Retry NFC Scan</button>
+        </div>
+
+        
+        <div class="debug-title">Debug Console</div>
+        <div id="debugConsole" class="debug-console"></div>
+    </div>
+
+    <script>
+        
+        function debugLog(message, type = 'info', data = null) {
+            const console = document.getElementById('debugConsole');
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            
+            if (data) {
+                try {
+                    logMessage += '\n' + JSON.stringify(data, null, 2);
+                } catch (e) {
+                    logMessage += '\n' + String(data);
+                }
+            }
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = type;
+            logEntry.textContent = logMessage;
+            console.prepend(logEntry);
+        }
+    
+        let currentStep = 1;
+        let requestNumber = null;
+        let signature = null;
+        let currentRating = null;
+        let currentDigest = null;
+    
+        function updateStep(step) {
+            currentStep = step;
+            debugLog(`Moving to step ${step}`, 'info');
+            document.querySelectorAll('.step').forEach((el, index) => {
+                el.classList.remove('active');
+                if (index + 1 < step) {
+                    el.classList.add('completed');
+                } else if (index + 1 === step) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('completed');
+                }
+            });
+        }
+    
+        async function createDigest(requestNumber, rating) {
+            debugLog(`Creating digest for request ${requestNumber} and rating ${rating}`, 'info');
+            const combined = `${requestNumber}-${rating}`;
+            const encoder = new TextEncoder();
+            const data = encoder.encode(combined);
+            
+            try {
+                const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const digest = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                debugLog(`Generated digest: ${digest}`, 'info');
+                return digest;
+            } catch (error) {
+                debugLog(`Error generating digest: ${error.message}`, 'error', error);
+                throw error;
+            }
+        }
+    
+        async function performNFCScan() {
+            const statusText = document.getElementById('statusText');
+            const actionButton = document.getElementById('actionButton');
+            const retryButton = document.getElementById('retryButton');
+    
+            debugLog('Starting NFC scan...', 'info', {
+                requestNumber,
+                currentRating,
+                currentDigest
+            });
+    
+            try {
+                statusText.innerText = 'Please tap your mentor\'s NFC tag...';
+                retryButton.style.display = 'none';
+    
+                debugLog('Executing HaLo command...', 'info', {
+                    name: "sign",
+                    keyNo: 1,
+                    digest: currentDigest
+                });
+    
+                const result = await execHaloCmdWeb({
+                    name: "sign",
+                    keyNo: 1,
+                    digest: currentDigest,
+                }, {
+                    statusCallback: (status) => {
+                        debugLog(`NFC Status Update: ${status}`, 'info');
+                        if (status === "init") {
+                            statusText.innerText = "Place your phone near the NFC tag...";
+                        } else if (status === "retry") {
+                            statusText.innerText = "Retrying NFC scan, please tap again...";
+                        } else if (status === "scanned") {
+                            statusText.innerText = "NFC tag scanned successfully!";
+                        }
+                    }
+                });
+    
+                debugLog('Raw NFC scan result:', 'info', result);
+    
+              
+                signature = result;
+    
+               
+                const previewText = result ? (typeof result === 'string' ? result : JSON.stringify(result)) : 'No signature data';
+                const shortPreview = previewText.length > 20 ? 
+                    `${previewText.slice(0, 10)}...${previewText.slice(-10)}` : 
+                    previewText;
+    
+                document.getElementById('signaturePreview').style.display = 'block';
+                document.getElementById('signatureShort').innerText = shortPreview;
+    
+                updateStep(4);
+                actionButton.textContent = 'Submit Rating';
+                actionButton.style.display = 'block';
+                retryButton.style.display = 'none';
+    
+                return true;
+            } catch (error) {
+                debugLog('NFC scan failed', 'error', {
+                    error: error.toString(),
+                    stack: error.stack,
+                    message: error.message,
+                    name: error.name
+                });
+    
+                statusText.innerText = `Error reading NFC tag: ${error.message}`;
+                retryButton.style.display = 'block';
+                actionButton.style.display = 'none';
+                return false;
+            }
+        }
+    
+        async function handleAction() {
+            const actionButton = document.getElementById('actionButton');
+            const ratingInput = document.getElementById('ratingInput');
+            const statusText = document.getElementById('statusText');
+            const retryButton = document.getElementById('retryButton');
+    
+            try {
+                if (currentStep === 1) {
+                    debugLog('Starting rating process', 'info');
+                    ratingInput.style.display = 'block';
+                    actionButton.textContent = 'Submit Rating';
+                    updateStep(2);
+                    statusText.innerText = 'Please enter your rating (1-10)';
+                } else if (currentStep === 2) {
+                    const rating = parseInt(ratingInput.value);
+                    debugLog('Rating submitted', 'info', { rating });
+    
+                    if (!rating || rating < 1 || rating > 10) {
+                        debugLog('Invalid rating', 'error', { rating });
+                        alert('Please enter a valid rating between 1 and 10');
+                        return;
+                    }
+    
+                    currentRating = rating;
+                    currentDigest = await createDigest(requestNumber, rating);
+    
+                    updateStep(3);
+                    actionButton.style.display = 'none';
+    
+                    const nfcSuccess = await performNFCScan();
+                    if (!nfcSuccess) {
+                        retryButton.style.display = 'block';
+                    }
+                } else if (currentStep === 4) {
+    debugLog('Submitting rating and attestation', 'info', {
+        requestNumber,
+        rating: currentRating,
+        signature
+    });
+
+    actionButton.disabled = true;
+    statusText.innerText = 'Submitting rating...';
+
+    
+    const ratingResponse = await fetch("https://arx.onrender.com/api/rate-mentor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            request_number: requestNumber,
+            rating: currentRating,
+            halo_signature: signature,
+        }),
+    });
+
+    const ratingResult = await ratingResponse.json();
+    debugLog('Rating submission response', 'info', ratingResult);
+
+    if (!ratingResponse.ok) {
+        throw new Error(ratingResult.error || 'Rating submission failed');
+    }
+
+    statusText.innerText = 'Rating submitted successfully! Proceeding with attestation...';
+
+    
+    const attestationResponse = await fetch("https://arx.onrender.com/api/attest", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            digest: currentDigest,
+            etherAddress: signature.etherAddress,
+            request_number: requestNumber,
+        }),
+    });
+
+    const attestationResult = await attestationResponse.json();
+    debugLog('Attestation API response', 'info', attestationResult);
+
+    if (!attestationResponse.ok) {
+        throw new Error(attestationResult.error || 'Attestation failed');
+    }
+
+    
+    const txnHash = attestationResult.transactionHash;
+    const txnLink = `https://eth-sepolia.blockscout.com/tx/${txnHash}`;
+    const attestationId = attestationResult.attestationId;
+
+    statusText.innerHTML = `
+        Attestation completed successfully!<br>
+        Transaction Hash: <a href="${txnLink}" target="_blank">${txnHash}</a><br>
+        Attestation ID: ${attestationId}
+    `;
+
+    document.getElementById('signaturePreview').innerHTML += `
+        <br>Transaction Hash: <a href="${txnLink}" target="_blank">${txnHash}</a>
+        <br>Attestation ID: ${attestationId}
+    `;
+    actionButton.style.display = 'none';
+}
+            } catch (error) {
+                debugLog('Error in handleAction', 'error', {
+                    step: currentStep,
+                    error: error.toString(),
+                    stack: error.stack
+                });
+                statusText.innerText = `Error: ${error.message}. Please try again.`;
+                actionButton.disabled = false;
+            }
+        }
+    
+    
+        window.addEventListener('load', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            requestNumber = urlParams.get('request_number');
+            
+            debugLog('Page initialized', 'info', {
+                requestNumber,
+                url: window.location.href
+            });
+    
+            if (!requestNumber) {
+                debugLog('No request number found', 'error');
+                document.getElementById('statusText').innerText = 'Error: No request number provided in URL';
+                return;
+            }
+    
+            try {
+                const response = await fetch(`https://arx.onrender.com/api/check-request/${requestNumber}`);
+                const result = await response.json();
+    
+                debugLog('Backend request check response', 'info', result);
+    
+                if (!response.ok) {
+                    throw new Error(result.error || 'Error fetching request status');
+                }
+    
+                if (result.isRated) {
+                    debugLog('Request already rated', 'warning');
+                    document.getElementById('statusText').innerText = 'This request has already been rated.';
+                    document.getElementById('actionButton').style.display = 'none';
+                    return;
+                }
+    
+                document.getElementById('statusText').innerText = `Request #${requestNumber} loaded`;
+                document.getElementById('actionButton').style.display = 'block';
+                updateStep(1);
+            } catch (error) {
+                debugLog('Error checking request status', 'error', error);
+                document.getElementById('statusText').innerText = `Error: ${error.message}`;
+            }
+        });
+    </script>

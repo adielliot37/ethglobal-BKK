@@ -1,0 +1,24 @@
+{
+    "name": "mentor-rating-system",
+    "version": "1.0.0",
+    "description": "Mentor rating system with MongoDB and Telegram integration",
+    "main": "index.js",
+    "scripts": {
+      "start": "node index.js",
+      "build": "echo 'No build step required'"
+    },
+    "dependencies": {
+      "axios": "^1.5.0",
+      "cors": "^2.8.5",
+      "express": "^4.18.2",
+      "dotenv": "^16.1.0",
+      "mongoose": "^7.3.1",
+      "ethers": "^5.7.2"
+    },
+    "engines": {
+      "node": ">=18.x"
+    },
+    "keywords": [],
+    "author": "Eddy",
+    "license": "MIT"
+  }

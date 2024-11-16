@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 400px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .leaderboard-item:nth-child(odd) {
+            background-color: #f1f1f1;
+        }
+
+        .username {
+            font-weight: bold;
+            color: #34495e;
+        }
+
+        .reputation {
+            color: #27ae60;
+        }
+
+        .loading {
+            color: #3498db;
+            font-size: 18px;
+            margin-top: 20px;
+        }
+
+        .error {
+            color: #e74c3c;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Leaderboard</h1>
+        <div id="leaderboard">
+            <p class="loading">Loading leaderboard...</p>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://arx.onrender.com/api/leaderboard'; 
+
+        async function fetchLeaderboard() {
+            const leaderboardDiv = document.getElementById('leaderboard');
+            leaderboardDiv.innerHTML = '<p class="loading">Loading leaderboard...</p>';
+
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Failed to fetch leaderboard data');
+
+                const leaderboardData = await response.json();
+                leaderboardDiv.innerHTML = ''; 
+                leaderboardData.forEach((item, index) => {
+                    const leaderboardItem = document.createElement('div');
+                    leaderboardItem.className = 'leaderboard-item';
+
+                    leaderboardItem.innerHTML = `
+                        <span class="username">${index + 1}. ${item.username}</span>
+                        <span class="reputation">${item.reputation}</span>
+                    `;
+
+                    leaderboardDiv.appendChild(leaderboardItem);
+                });
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                leaderboardDiv.innerHTML = `<p class="error">Failed to load leaderboard. Please try again later.</p>`;
+            }
+        }
+
+       
+        fetchLeaderboard();
+    </script>
+</body>
+</html>
